@@ -1,74 +1,65 @@
-import cv2
+# Per prima cosa installo mediapipe
+!pip install mediapipe
+
+# Poi scarico i pacchetti dei modelli. 
+# Nella documentazione di MediaPipe vi sono ulteriori informazioni su questi bundle di modelli
+!wget -O face_landmarker_v2_with_blendshapes.task -q https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+
+from mediapipe import solutions
 import mediapipe as mp
+from mediapipe.framework.formats import landmark_pb2
+import numpy as np
+import cv2
 import matplotlib.pyplot as plt
+from google.colab.patches import cv2_imshow  # Questo mi serve per visualizzare l'immagine 
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
 
-# Inizializzazione del rilevatore di landmark facciali di MediaPipe
-mp_drawing = mp.solutions.drawing_utils
-mp_face_mesh = mp.solutions.face_mesh
+# Creo la funzione draw_landmarks_on_image che mi disegna sull'immagine i landmark riconosciuti sull'iride
+# La funzione ritorna l'immagine già con i landmark disegnati
+def draw_landmarks_on_image(rgb_image, detection_result):
+  face_landmarks_list = detection_result.face_landmarks
+  annotated_image = np.copy(rgb_image)
 
-# Carica l'immagine da Google Drive
+  # Qui si passano in rassegna i volti rilevati nell'immagine per visualizzarli.
+  for idx in range(len(face_landmarks_list)):
+    face_landmarks = face_landmarks_list[idx]
+
+    # Qui vengono disegnati i landmark sulle iridi
+    face_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
+    face_landmarks_proto.landmark.extend([ landmark_pb2.NormalizedLandmark(x=landmark.x, y=landmark.y, z=landmark.z) for landmark in face_landmarks ])
+
+    solutions.drawing_utils.draw_landmarks(
+        image=annotated_image,
+        landmark_list=face_landmarks_proto,
+        connections=mp.solutions.face_mesh.FACEMESH_IRISES,
+          landmark_drawing_spec=None,
+          connection_drawing_spec=mp.solutions.drawing_styles
+          .get_default_face_mesh_iris_connections_style())
+
+  return annotated_image
+
+# Importo l'immagine da Google Drive
 from google.colab import drive
 drive.mount('/content/drive')
-image_path = '/content/drive/MyDrive/Tirocinio/frame6.jpg'
-image = cv2.imread(image_path)
+image_path = '/content/drive/MyDrive/Tirocinio/frame1.jpg'
+img = cv2.imread(image_path)
 
-# Inizializzazione del rilevatore di landmark facciali e ottengo i landmark
-with mp_face_mesh.FaceMesh(
-    static_image_mode=True, max_num_faces=1, 
-    min_detection_confidence=0.5, min_tracking_confidence=0.5) as face_mesh:
-    results = face_mesh.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    landmarks = results.multi_face_landmarks
+# Successivamente, inizio con i passaggi per il riconoscimento dei landmark
+# Passaggio 1 --> Crea un oggetto FaceLandmarker
+base_options = python.BaseOptions(model_asset_path='face_landmarker_v2_with_blendshapes.task')
+options = vision.FaceLandmarkerOptions(base_options=base_options,
+                                       output_face_blendshapes=True,
+                                       output_facial_transformation_matrixes=True,
+                                       num_faces=1)
+detector = vision.FaceLandmarker.create_from_options(options)
 
+# Passaggio 2 --> Carica una immagine in input
+image = mp.Image.create_from_file(image_path)
 
-if landmarks:
-    # Trovare i landmark corrispondenti agli occhi.
-    # Utilizzo 33-48 per l'occhio sinistro e 263-280 per l'occhio destro
-    left_eye_landmarks = landmarks[0].landmark[33:48]
-    right_eye_landmarks = landmarks[0].landmark[263:280]
+# Passaggio 3 --> Rileva tutti i punti di riferimento del viso dall'immagine data in input
+detection_result = detector.detect(image)
 
-# Calcolo dei punti estremi dell'eye region per entrambi gli occhi.
-# Provo per adesso ad utilizzare il valore massimo e minimo delle coordinate x e y dei landmark per avere il rettangolo che contiene l'occhio.
-left_eye_x = [int(landmark.x * image.shape[1]) for landmark in left_eye_landmarks]
-left_eye_y = [int(landmark.y * image.shape[0]) for landmark in left_eye_landmarks]
-right_eye_x = [int(landmark.x * image.shape[1]) for landmark in right_eye_landmarks]
-right_eye_y = [int(landmark.y * image.shape[0]) for landmark in right_eye_landmarks]
-
-left_eye_min_x = min(left_eye_x)
-left_eye_max_x = max(left_eye_x)
-left_eye_min_y = min(left_eye_y)
-left_eye_max_y = max(left_eye_y)
-
-right_eye_min_x = min(right_eye_x)
-right_eye_max_x = max(right_eye_x)
-right_eye_min_y = min(right_eye_y)
-right_eye_max_y = max(right_eye_y)
-
-# Qui faccio il cropping degli occhi dall'immagine originale
-left_eye_region = image[left_eye_min_y:left_eye_max_y, left_eye_min_x:left_eye_max_x]
-right_eye_region = image[right_eye_min_y:right_eye_max_y, right_eye_min_x:right_eye_max_x]
-
-# Se ora visualizzassi left_eye_region e right_eye_region sarebbero troppo grandi, quindi le ridimensiono
-
-display_width = 200  # Questa variabile mi dice la larghezza dell'immagine da visualizzare
-
-# Ridimensiono le due immagini degli occhi
-left_eye_display = cv2.resize(left_eye_region, (display_width, int(display_width * left_eye_region.shape[0] / left_eye_region.shape[1])))
-right_eye_display = cv2.resize(right_eye_region, (display_width, int(display_width * right_eye_region.shape[0] / right_eye_region.shape[1])))
-
-# Visualizzo le immagini messe nella dimensione che desidero
-plt.figure(figsize=(6, 3))
-plt.subplot(1, 2, 1)
-plt.imshow(cv2.cvtColor(left_eye_display, cv2.COLOR_BGR2RGB))
-plt.title("Eye sinistro")
-plt.axis('off')
-
-plt.subplot(1, 2, 2)
-plt.imshow(cv2.cvtColor(right_eye_display, cv2.COLOR_BGR2RGB))
-plt.title("Eye destro")
-plt.axis('off')
-
-plt.show()
-
-# Qui salvo le due immagini dei due occhi nella cartella Output su drive
-#cv2.imwrite('/content/drive/MyDrive/Tirocinio/Output/left_eye.jpg', left_eye_display)
-#cv2.imwrite('/content/drive/MyDrive/Tirocinio/Output/right_eye.jpg', right_eye_display)
+# Passaggio 4 --> Elaborare il risultato del rilevamento, per poi visualizzarlo
+annotated_image = draw_landmarks_on_image(image.numpy_view(), detection_result)
+cv2_imshow(cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
