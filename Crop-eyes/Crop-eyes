@@ -42,7 +42,7 @@ def draw_landmarks_on_image(rgb_image, detection_result):
 # Importo l'immagine da Google Drive
 from google.colab import drive
 drive.mount('/content/drive')
-image_path = '/content/drive/MyDrive/Tirocinio/frame1.jpg'
+image_path = '/content/drive/MyDrive/Tirocinio/frame6.jpg'
 img = cv2.imread(image_path)
 
 # Successivamente, inizio con i passaggi per il riconoscimento dei landmark
@@ -63,3 +63,55 @@ detection_result = detector.detect(image)
 # Passaggio 4 --> Elaborare il risultato del rilevamento, per poi visualizzarlo
 annotated_image = draw_landmarks_on_image(image.numpy_view(), detection_result)
 cv2_imshow(cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
+
+# Supponiamo che detection_result.face_landmarks contenga una lista di NormalizedLandmark per gli occhi
+face_landmarks = detection_result.face_landmarks[0]
+
+# Estrai le coordinate dei landmark delle iridi per l'occhio sinistro
+eye_landmark_left = face_landmarks[:5]
+
+# Estrai le coordinate dei landmark delle iridi per l'occhio destro
+eye_landmark_right = face_landmarks[5:10]
+
+# Calcola il punto al centro dell'occhio sinistro usando la punta e l'angolo esterno
+eye_left_center_x = (eye_landmark_left[0].x + eye_landmark_left[3].x) / 2
+eye_left_center_y = (eye_landmark_left[0].y + eye_landmark_left[3].y) / 2
+eye_left_center = (eye_left_center_x, eye_left_center_y)
+
+# Calcola il punto al centro dell'occhio destro usando la punta e l'angolo esterno
+eye_right_center_x = (eye_landmark_right[0].x + eye_landmark_right[3].x) / 2
+eye_right_center_y = (eye_landmark_right[0].y + eye_landmark_right[3].y) / 2
+eye_right_center = (eye_right_center_x, eye_right_center_y)
+
+print("Centro dell'occhio sinistro:", eye_left_center)
+print("Centro dell'occhio destro:", eye_right_center)
+
+# Carica l'immagine originale senza landmark
+original_image = cv2.imread(image_path)
+
+# Disegna un cerchio o punto sul centro dell'occhio sinistro
+cv2.circle(original_image, (int(eye_left_center_x * original_image.shape[1]), int(eye_left_center_y * original_image.shape[0])), 5, (0, 255, 0), -1)
+
+# Disegna un cerchio o punto sul centro dell'occhio destro
+cv2.circle(original_image, (int(eye_right_center_x * original_image.shape[1]), int(eye_right_center_y * original_image.shape[0])), 5, (0, 255, 0), -1)
+
+# Visualizza l'immagine con i punti al centro degli occhi evidenziati
+cv2_imshow(cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB))
+
+# Dimensioni del rettangolo di ritaglio
+larghezza_ritaglio = 50
+altezza_ritaglio = 50
+
+# Calcola le coordinate del rettangolo di ritaglio
+left = max(0, int(eye_left_center[0] - larghezza_ritaglio // 2))
+top = max(0, int(eye_left_center[1] - altezza_ritaglio // 2))
+right = min(img.shape[1], int(eye_left_center[0] + larghezza_ritaglio // 2))
+bottom = min(img.shape[0], int(eye_left_center[1] + altezza_ritaglio // 2))
+
+# Ritaglia l'immagine utilizzando le coordinate calcolate
+immagine_ritagliata = img[top:bottom, left:right]
+
+# Visualizza l'immagine ritagliata con matplotlib
+plt.imshow(cv2.cvtColor(immagine_ritagliata, cv2.COLOR_BGR2RGB))
+plt.axis('off')  # Nasconde gli assi
+plt.show()
