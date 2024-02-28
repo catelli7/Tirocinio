@@ -1,9 +1,11 @@
 # Per prima cosa installo mediapipe
 !pip install mediapipe
 
-# Poi scarico i pacchetti dei modelli. 
+# Poi scarico i pacchetti dei modelli.
 # Nella documentazione di MediaPipe vi sono ulteriori informazioni su questi bundle di modelli
 !wget -O face_landmarker_v2_with_blendshapes.task -q https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+
+# Qui importo tutto quello che mi serve
 
 from mediapipe import solutions
 import mediapipe as mp
@@ -11,9 +13,14 @@ from mediapipe.framework.formats import landmark_pb2
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-from google.colab.patches import cv2_imshow  # Questo mi serve per visualizzare l'immagine 
+from google.colab.patches import cv2_imshow  # Questo mi serve per visualizzare l'immagine
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
+from PIL import Image
+from re import I
+
+# Prendo l'immagine
+file = '/content/drive/MyDrive/Tirocinio/frame1.jpg'
 
 # Creo la funzione draw_landmarks_on_image che mi disegna sull'immagine i landmark riconosciuti sull'iride
 # La funzione ritorna l'immagine già con i landmark disegnati
@@ -39,12 +46,6 @@ def draw_landmarks_on_image(rgb_image, detection_result):
 
   return annotated_image
 
-# Importo l'immagine da Google Drive
-from google.colab import drive
-drive.mount('/content/drive')
-image_path = '/content/drive/MyDrive/Tirocinio/frame6.jpg'
-img = cv2.imread(image_path)
-
 # Successivamente, inizio con i passaggi per il riconoscimento dei landmark
 # Passaggio 1 --> Crea un oggetto FaceLandmarker
 base_options = python.BaseOptions(model_asset_path='face_landmarker_v2_with_blendshapes.task')
@@ -55,7 +56,7 @@ options = vision.FaceLandmarkerOptions(base_options=base_options,
 detector = vision.FaceLandmarker.create_from_options(options)
 
 # Passaggio 2 --> Carica una immagine in input
-image = mp.Image.create_from_file(image_path)
+image = mp.Image.create_from_file(file)
 
 # Passaggio 3 --> Rileva tutti i punti di riferimento del viso dall'immagine data in input
 detection_result = detector.detect(image)
@@ -64,54 +65,72 @@ detection_result = detector.detect(image)
 annotated_image = draw_landmarks_on_image(image.numpy_view(), detection_result)
 cv2_imshow(cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
 
-# Supponiamo che detection_result.face_landmarks contenga una lista di NormalizedLandmark per gli occhi
-face_landmarks = detection_result.face_landmarks[0]
+mp_drawing = mp.solutions.drawing_utils
+mp_face_mesh = mp.solutions.face_mesh
 
-# Estrai le coordinate dei landmark delle iridi per l'occhio sinistro
-eye_landmark_left = face_landmarks[:5]
+drawing_spec = mp_drawing.DrawingSpec(thickness=2, circle_radius=1, color=(4, 244, 4))
 
-# Estrai le coordinate dei landmark delle iridi per l'occhio destro
-eye_landmark_right = face_landmarks[5:10]
+# Crea un oggetto mesh facciale
+with mp_face_mesh.FaceMesh(static_image_mode=True, max_num_faces=1, refine_landmarks=True, min_detection_confidence=0.5) as face_mesh:
 
-# Calcola il punto al centro dell'occhio sinistro usando la punta e l'angolo esterno
-eye_left_center_x = (eye_landmark_left[0].x + eye_landmark_left[3].x) / 2
-eye_left_center_y = (eye_landmark_left[0].y + eye_landmark_left[3].y) / 2
-eye_left_center = (eye_left_center_x, eye_left_center_y)
+    # Leggo l'immagine con cv2
+    image = cv2.imread(file)
+    # Converto l'immagine da BGR a RGB
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    # Processo l'immagine
+    results = face_mesh.process(image_rgb)
 
-# Calcola il punto al centro dell'occhio destro usando la punta e l'angolo esterno
-eye_right_center_x = (eye_landmark_right[0].x + eye_landmark_right[3].x) / 2
-eye_right_center_y = (eye_landmark_right[0].y + eye_landmark_right[3].y) / 2
-eye_right_center = (eye_right_center_x, eye_right_center_y)
+face_found = bool(results.multi_face_landmarks)
 
-print("Centro dell'occhio sinistro:", eye_left_center)
-print("Centro dell'occhio destro:", eye_right_center)
+if face_found:
+    # Creo una copia dell'immagine
+    annotated_image = image.copy()
 
-# Carica l'immagine originale senza landmark
-original_image = cv2.imread(image_path)
+    # Inizializza un elenco vuoto per memorizzare tutti i punti
+    all_landmarks = []
 
-# Disegna un cerchio o punto sul centro dell'occhio sinistro
-cv2.circle(original_image, (int(eye_left_center_x * original_image.shape[1]), int(eye_left_center_y * original_image.shape[0])), 5, (0, 255, 0), -1)
+    # Disegna punti di riferimento e memorizza le loro posizioni
+    for face_landmarks in results.multi_face_landmarks:
+        mp_drawing.draw_landmarks(
+            image=annotated_image,
+            landmark_list=face_landmarks,
+            connections=mp_face_mesh.FACEMESH_TESSELATION,
+            landmark_drawing_spec=drawing_spec,
+            connection_drawing_spec=mp_drawing.DrawingSpec(color=(0, 255, 255), thickness=1)
+        )
 
-# Disegna un cerchio o punto sul centro dell'occhio destro
-cv2.circle(original_image, (int(eye_right_center_x * original_image.shape[1]), int(eye_right_center_y * original_image.shape[0])), 5, (0, 255, 0), -1)
+        # Memorizza i punti di riferimento in all_landmarks
+        for landmark in face_landmarks.landmark:
+            all_landmarks.append((landmark.x, landmark.y, landmark.z))
 
-# Visualizza l'immagine con i punti al centro degli occhi evidenziati
-cv2_imshow(cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB))
+    # Salva l'immagine con i punti di riferimento
+    cv2.imwrite('face_tesselation_only.png', annotated_image)
 
-# Dimensioni del rettangolo di ritaglio
-larghezza_ritaglio = 50
-altezza_ritaglio = 50
+    # Visualizza l'immagine
+    cv2_imshow(annotated_image)
 
-# Calcola le coordinate del rettangolo di ritaglio
-left = max(0, int(eye_left_center[0] - larghezza_ritaglio // 2))
-top = max(0, int(eye_left_center[1] - altezza_ritaglio // 2))
-right = min(img.shape[1], int(eye_left_center[0] + larghezza_ritaglio // 2))
-bottom = min(img.shape[0], int(eye_left_center[1] + altezza_ritaglio // 2))
+if face_found:
+    # Inizializza un elenco vuoto per memorizzare i punti di riferimento del centro degli occhi
+    eye_center_landmarks = []
 
-# Ritaglia l'immagine utilizzando le coordinate calcolate
-immagine_ritagliata = img[top:bottom, left:right]
+    # Scorro ogni punto di riferimento del volto
+    for face_landmarks in results.multi_face_landmarks:
+        # Indici dei landmark dell'occhio sinistro
+        left_eye_landmarks_indices = [474,475, 476, 477]
+        # Indici dei landmark dell'occhio destro
+        right_eye_landmarks_indices = [469, 470, 471, 472]
 
-# Visualizza l'immagine ritagliata con matplotlib
-plt.imshow(cv2.cvtColor(immagine_ritagliata, cv2.COLOR_BGR2RGB))
-plt.axis('off')  # Nasconde gli assi
-plt.show()
+        # Disegno i landmark dell'occhio sinistro
+        for i in left_eye_landmarks_indices:
+            landmark = face_landmarks.landmark[i]
+            eye_center_landmarks.append((landmark.x, landmark.y, landmark.z))
+            cv2.circle(image, (int(landmark.x * image.shape[1]), int(landmark.y * image.shape[0])), 2, (0, 255, 0), -1)
+
+        # Disegno i landmark dell'occhio destro
+        for i in right_eye_landmarks_indices:
+            landmark = face_landmarks.landmark[i]
+            eye_center_landmarks.append((landmark.x, landmark.y, landmark.z))
+            cv2.circle(image, (int(landmark.x * image.shape[1]), int(landmark.y * image.shape[0])), 2, (0, 255, 0), -1)
+
+    # Visualizza l'immagine con i landmark dell'occhio
+    cv2_imshow(image)
