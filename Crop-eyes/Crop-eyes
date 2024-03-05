@@ -18,8 +18,13 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from PIL import Image
 from re import I
+from google.colab import drive
+import os
 
 # Prendo l'immagine
+drive.mount('/content/drive')
+
+# Percorso del file su Google Drive
 file = '/content/drive/MyDrive/Tirocinio/frame1.jpg'
 
 # Creo la funzione draw_landmarks_on_image che mi disegna sull'immagine i landmark riconosciuti sull'iride
@@ -110,27 +115,57 @@ if face_found:
     cv2_imshow(annotated_image)
 
 if face_found:
-    # Inizializza un elenco vuoto per memorizzare i punti di riferimento del centro degli occhi
-    eye_center_landmarks = []
+  # Inizializza un elenco vuoto per memorizzare i punti di riferimento del centro degli occhi
+  eye_landmarks = {'left': [], 'right': []}
 
-    # Scorro ogni punto di riferimento del volto
-    for face_landmarks in results.multi_face_landmarks:
-        # Indici dei landmark dell'occhio sinistro
-        left_eye_landmarks_indices = [474,475, 476, 477]
-        # Indici dei landmark dell'occhio destro
-        right_eye_landmarks_indices = [469, 470, 471, 472]
+  # Scorro ogni punto di riferimento del volto
+  for face_landmarks in results.multi_face_landmarks:
+      # Indici dei landmark dell'occhio sinistro
+      left_eye_landmarks_indices = [474,475, 476, 477]
+      # Indici dei landmark dell'occhio destro
+      right_eye_landmarks_indices = [469, 470, 471, 472]
 
-        # Disegno i landmark dell'occhio sinistro
-        for i in left_eye_landmarks_indices:
-            landmark = face_landmarks.landmark[i]
-            eye_center_landmarks.append((landmark.x, landmark.y, landmark.z))
-            cv2.circle(image, (int(landmark.x * image.shape[1]), int(landmark.y * image.shape[0])), 2, (0, 255, 0), -1)
+      # Disegno i landmark dell'occhio sinistro e li metto nella variabile eye_landmarks
+      for i in left_eye_landmarks_indices:
+          landmark = face_landmarks.landmark[i]
+          eye_landmarks['left'].append((landmark.x, landmark.y))
+          cv2.circle(image, (int(landmark.x * image.shape[1]), int(landmark.y * image.shape[0])), 2, (0, 255, 0), -1)
 
-        # Disegno i landmark dell'occhio destro
-        for i in right_eye_landmarks_indices:
-            landmark = face_landmarks.landmark[i]
-            eye_center_landmarks.append((landmark.x, landmark.y, landmark.z))
-            cv2.circle(image, (int(landmark.x * image.shape[1]), int(landmark.y * image.shape[0])), 2, (0, 255, 0), -1)
+      # Disegno i landmark dell'occhio destro e li metto nella variabile eye_landmarks
+      for i in right_eye_landmarks_indices:
+          landmark = face_landmarks.landmark[i]
+          eye_landmarks['right'].append((landmark.x, landmark.y))
+          cv2.circle(image, (int(landmark.x * image.shape[1]), int(landmark.y * image.shape[0])), 2, (0, 255, 0), -1)
 
-    # Visualizza l'immagine con i landmark dell'occhio
-    cv2_imshow(image)
+  # Visualizza l'immagine con i landmark dell'occhio
+  cv2_imshow(image)
+  print()
+  
+  # Stampa le coordinate dei landmark degli occhi
+  print("Coordinate dei landmark dell'occhio sinistro:")
+  print(eye_landmarks['left'])
+  print()
+  print("Coordinate dei landmark dell'occhio destro:")
+  print(eye_landmarks['right'])
+
+# Calcolo il baricentro dei 4 punti per ricavare il centro dell'occhio
+
+# Calcola il baricentro per l'occhio sinistro
+somma_x_left = sum(punto[0] for punto in eye_landmarks['left'])
+somma_y_left = sum(punto[1] for punto in eye_landmarks['left'])
+numero_punti_left = len(eye_landmarks['left'])
+baricentro_x_left = somma_x_left / numero_punti_left
+baricentro_y_left = somma_y_left / numero_punti_left
+
+# Calcola il baricentro per l'occhio destro
+somma_x_right = sum(punto[0] for punto in eye_landmarks['right'])
+somma_y_right = sum(punto[1] for punto in eye_landmarks['right'])
+numero_punti_right = len(eye_landmarks['right'])
+baricentro_x_right = somma_x_right / numero_punti_right
+baricentro_y_right = somma_y_right / numero_punti_right
+
+baricentro_occhio_sinistro = (baricentro_x_left, baricentro_y_left)
+baricentro_occhio_destro = (baricentro_x_right, baricentro_y_right)
+
+print("Il baricentro dell'occhio sinistro è:", baricentro_occhio_sinistro)
+print("Il baricentro dell'occhio destro è:", baricentro_occhio_destro)
