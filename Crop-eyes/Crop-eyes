@@ -169,3 +169,82 @@ baricentro_occhio_destro = (baricentro_x_right, baricentro_y_right)
 
 print("Il baricentro dell'occhio sinistro è:", baricentro_occhio_sinistro)
 print("Il baricentro dell'occhio destro è:", baricentro_occhio_destro)
+
+# Per aiutarci nel ritaglio dell'immagine, serve convertire le coordinate di essa in px
+
+# Per prima cosa ricarichiamo la stessa immagine, in image_test utilizzando OpenCV e non Mediapipe
+image_test = cv2.imread(file)
+# Prendendo l'immagine con OpenCV avremo le sue dimensioni in px
+
+if image_test is not None:
+    # Ottengo le dimensioni dell'immagine
+    height, width, channels = image_test.shape
+
+    print("Larghezza dell'immagine:", width)
+    print("Altezza dell'immagine:", height)
+else:
+    print("Impossibile caricare l'immagine.")
+
+# Creo una lista destro, che conterrà tutte le coordinate dei landmarks trovati dell'occhio destro, convertite in px
+destro = []
+destro.append((int(eye_landmarks['right'][0][0] * width), int(eye_landmarks['right'][0][1] * height)))
+destro.append((int(eye_landmarks['right'][1][0] * width), int(eye_landmarks['right'][1][1] * height)))
+destro.append((int(eye_landmarks['right'][2][0] * width), int(eye_landmarks['right'][2][1] * height)))
+destro.append((int(eye_landmarks['right'][3][0] * width), int(eye_landmarks['right'][3][1] * height)))
+
+# Creo una lista sinistro, che conterrà tutte le coordinate dei landmarks trovati dell'occhio sinistro, convertite in px
+sinistro = []
+sinistro.append((int(eye_landmarks['left'][0][0] * width), int(eye_landmarks['left'][0][1] * height)))
+sinistro.append((int(eye_landmarks['left'][1][0] * width), int(eye_landmarks['left'][1][1] * height)))
+sinistro.append((int(eye_landmarks['left'][2][0] * width), int(eye_landmarks['left'][2][1] * height)))
+sinistro.append((int(eye_landmarks['left'][3][0] * width), int(eye_landmarks['left'][3][1] * height)))
+
+print("Coordinate punti occhio destro: ", destro)
+print("Coordinate punti occhio sinistro: ", sinistro)
+
+# Ora voglio convertire anche i punti del centro dell'occhio
+centro_destro = []
+centro_destro.append((int(baricentro_occhio_destro[0] * width), int(baricentro_occhio_destro[1] * height)))
+print(centro_destro)
+
+# Lascio commentata questa parte di codice, l'ho usato solo per controllare dove fosse il baricentro dell'occhio destro che ho trovato
+#cv2.circle(image_test, (centro_destro[0][0], centro_destro[0][1]), 1, (0, 255, 0), 1)
+#cv2_imshow(image_test)
+
+centro_sinistro = []
+centro_sinistro.append((int(baricentro_occhio_sinistro[0] * width), int(baricentro_occhio_sinistro[1] * height)))
+print(centro_sinistro)
+
+# Lascio commentata questa parte di codice, l'ho usato solo per controllare dove fosse il baricentro dell'occhio sinistro che ho trovato
+#cv2.circle(image_test, (centro_sinistro[0][0], centro_sinistro[0][1]), 1, (0, 0, 255), 1)
+#cv2_imshow(image_test)
+
+# Creo un rettangolo per ogni occhio, utilizzo i 4 punti di ogni occhio e le loro coordinate
+cv2.rectangle(image_test, (destro[2][0], destro[1][1]), (destro[0][0], destro[3][1]), (0, 255, 0), 2)
+cv2.rectangle(image_test, (sinistro[2][0], sinistro[1][1]), (sinistro[0][0], sinistro[3][1]), (0, 0, 255), 2)
+cv2_imshow(image_test)
+
+# Ora ritaglio i due occhi e salvo queste due immagini
+occhio_destro = image_test[destro[1][1]:destro[3][1], destro[2][0]:destro[0][0]]
+cv2_imshow(occhio_destro)
+print()
+occhio_sinistro = image_test[sinistro[1][1]:sinistro[3][1], sinistro[2][0]:sinistro[0][0]]
+cv2_imshow(occhio_sinistro)
+
+# Siccome le immagini degli occhi, le ingrandisco utilizzando resize()
+# Definisco il fattore di ingrandimento
+fattore_ingrandimento = 7  # Puoi cambiare questo valore a seconda della dimensione desiderata
+
+# Applichiamo il ridimensionamento all'occhio destro e lo stampiamo
+destro = cv2.resize(occhio_destro, (occhio_destro.shape[1] * fattore_ingrandimento, occhio_destro.shape[0] * fattore_ingrandimento))
+cv2_imshow(destro)
+#destro.save("/content/drive/MyDrive/Tirocinio/occhio-destro.jpg")
+
+# Salvo ora l'immagine nella cartella output del drive, utilizzando imsave, importato da skimage.io 
+imsave("/content/drive/MyDrive/Tirocinio/Output/occhio-destro.jpg", destro)
+print()
+
+# Applichiamo il ridimensionamento all'occhio destro e lo stampiamo
+sinistro = cv2.resize(occhio_sinistro, (occhio_sinistro.shape[1] * fattore_ingrandimento, occhio_sinistro.shape[0] * fattore_ingrandimento))
+cv2_imshow(sinistro)
+imsave("/content/drive/MyDrive/Tirocinio/Output/occhio-sinistro.jpg", sinistro)
