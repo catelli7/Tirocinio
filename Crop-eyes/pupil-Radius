@@ -1,0 +1,105 @@
+# Importazione librerie
+
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
+from google.colab.patches import cv2_imshow  # Questo mi serve per visualizzare l'immagine
+from PIL import Image
+from re import I
+from google.colab import drive
+import os
+from skimage.io import imsave # Serve per salvare le immagini sul drive
+from skimage.color import rgb2gray
+from skimage import img_as_ubyte
+from skimage.io import imread
+
+# Importazione librerie
+from skimage import feature
+from skimage.transform import (hough_circle, hough_circle_peaks)
+from skimage.draw import circle_perimeter
+import numpy as np
+import matplotlib.pyplot as plt
+
+immagine = imread('/content/drive/MyDrive/Tirocinio/occhio.jpg')
+
+# Visualizzo l'immagine
+plt.figure(figsize=(6,6))
+plt.subplot(121)
+plt.imshow(immagine)
+
+# Converto l'immagine ai livelli di grigio
+grigi = img_as_ubyte(rgb2gray(immagine))
+
+# Visualizzo l'immagine ai livelli di grigio
+plt.subplot(122)
+plt.imshow(grigi, cmap='gray')
+plt.show()
+
+# Per rilevare i bordi dell'immagine utilizzo l'algoritmo Canny
+# Prende in ingresso un'immagine in scala di grigi e produce in uscita un'immagine che enfatizza la posizione dei bordi.
+edges = cv2.Canny(grigi,50,150,apertureSize = 3)
+plt.imshow(edges, cmap='gray')
+plt.show()
+
+from skimage import feature
+
+edges1 = feature.canny(grigi)
+edges2 = feature.canny(grigi, sigma=6)
+fig, (axes1, axes2, axes3) = plt.subplots(nrows=1, ncols=3, figsize=(30,12), sharex=True, sharey=True)
+axes1.imshow(immagine, cmap=plt.cm.gray), axes1.axis('off'),
+axes1.set_title('noisy image', fontsize=50)
+axes2.imshow(edges1, cmap=plt.cm.gray), axes2.axis('off')
+axes2.set_title('Canny filter, $\sigma=1$', fontsize=50)
+axes3.imshow(edges2, cmap=plt.cm.gray), axes3.axis('off')
+axes3.set_title('Canny filter, $\sigma=6$', fontsize=50)
+fig.tight_layout()
+plt.show()
+
+from skimage.transform import (hough_circle, hough_circle_peaks)
+from skimage.draw import circle_perimeter
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Applica la trasformata di Hough per individuare i cerchi
+hough_radii = np.arange(5, 100, 2)
+hough_res = hough_circle(edges2, hough_radii)
+
+# Trova i picchi nella trasformata di Hough
+accums, cx, cy, radii = hough_circle_peaks(hough_res, hough_radii, total_num_peaks=1)
+
+# Crea un'immagine vuota per disegnare i cerchi individuati
+image_with_circles = np.zeros_like(edges2)
+
+# Dimensioni dell'immagine
+height, width = edges2.shape
+
+# Disegna i cerchi individuati sull'immagine vuota
+for center_y, center_x, radius in zip(cy, cx, radii):
+    # Calcola le coordinate del cerchio
+    circy, circx = circle_perimeter(center_y, center_x, radius)
+    
+    # Limita le coordinate del cerchio all'interno dei limiti dell'immagine
+    circy = np.clip(circy, 0, height - 1)
+    circx = np.clip(circx, 0, width - 1)
+    
+    # Disegna il cerchio sull'immagine
+    image_with_circles[circy, circx] = 1
+
+    # Disegna il cerchio sull'immagine originale
+    cerchi_originale = cv2.circle(immagine, (center_x, center_y), radius, (0, 255, 0), 1)
+
+# Crea una figura e gli assi per visualizzare le immagini affiancate
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+
+# Visualizza l'immagine con i cerchi individuati
+ax1.imshow(image_with_circles, cmap='gray')
+ax1.set_title('Cerchio riconosciuto')
+ax1.axis('off')
+
+# Visualizza l'immagine originale con i cerchi disegnati
+ax2.imshow(cerchi_originale)
+ax2.set_title('Immagine originale con il cerchio disegnato')
+ax2.axis('off')
+
+# Mostra la figura contenente entrambe le immagini
+plt.show()
